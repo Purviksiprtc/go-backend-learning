@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+
 	"user-crud-go/config"
 	"user-crud-go/models"
 	"user-crud-go/routes"
@@ -15,5 +17,10 @@ func main() {
 	e := echo.New()
 	routes.RegisterRoutes(e)
 
-	e.Start(":8080")
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080" // fallback safety
+	}
+
+	e.Start(":" + port)
 }
