@@ -2,10 +2,13 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
+	"time"
 
 	"user-crud-go/config"
 	"user-crud-go/models"
+	"user-crud-go/rabbitmq"
 	"user-crud-go/request"
 	"user-crud-go/response"
 
@@ -62,6 +65,22 @@ func CreateUser(c echo.Context) error {
 		})
 	}
 
+	// 🔔 USER_CREATED EVENT
+	event := rabbitmq.UserEvent{
+		Event:     "USER_CREATED",
+		Version:   "1.0",
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Data: rabbitmq.UserData{
+			UserID: user.ID,
+			Name:   user.Name,
+			Email:  user.Email,
+		},
+	}
+
+	if err := rabbitmq.PublishEvent("user.created", event); err != nil {
+		log.Println("Failed to publish USER_CREATED event:", err)
+	}
+
 	return c.JSON(http.StatusCreated, response.APIResponse{
 		Status:  "success",
 		Message: "User created successfully",
@@ -74,12 +93,11 @@ func CreateUser(c echo.Context) error {
 }
 
 /* ---------------- GET ALL USERS ---------------- */
+
 func GetUsers(c echo.Context) error {
-	// Defaults
 	page := 1
 	perPage := 10
 
-	// Query params
 	name := c.QueryParam("name")
 	email := c.QueryParam("email")
 
@@ -102,11 +120,9 @@ func GetUsers(c echo.Context) error {
 	var users []models.User
 	var total int64
 
-	// Base query (soft delete excluded)
 	query := config.DB.Model(&models.User{}).
 		Where("deleted_at IS NULL")
 
-	// Apply filters
 	if name != "" {
 		query = query.Where("name ILIKE ?", "%"+name+"%")
 	}
@@ -114,7 +130,6 @@ func GetUsers(c echo.Context) error {
 		query = query.Where("email ILIKE ?", "%"+email+"%")
 	}
 
-	// Count
 	if err := query.Count(&total).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, response.APIResponse{
 			Status:  "error",
@@ -122,7 +137,6 @@ func GetUsers(c echo.Context) error {
 		})
 	}
 
-	// Fetch paginated data
 	if err := query.
 		Limit(perPage).
 		Offset(offset).
@@ -133,7 +147,6 @@ func GetUsers(c echo.Context) error {
 		})
 	}
 
-	// Map response
 	data := make([]response.UserResponse, 0)
 	for _, u := range users {
 		data = append(data, response.UserResponse{
@@ -220,7 +233,6 @@ func UpdateUser(c echo.Context) error {
 	user.Name = req.Name
 	user.Email = req.Email
 
-	// ✅ Password update support
 	if req.Password != "" {
 		hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), 10)
 		if err != nil {
@@ -237,6 +249,22 @@ func UpdateUser(c echo.Context) error {
 			Status:  "error",
 			Message: "Failed to update user",
 		})
+	}
+
+	// 🔔 USER_UPDATED EVENT
+	event := rabbitmq.UserEvent{
+		Event:     "USER_UPDATED",
+		Version:   "1.0",
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Data: rabbitmq.UserData{
+			UserID: user.ID,
+			Name:   user.Name,
+			Email:  user.Email,
+		},
+	}
+
+	if err := rabbitmq.PublishEvent("user.updated", event); err != nil {
+		log.Println("Failed to publish USER_UPDATED event:", err)
 	}
 
 	return c.JSON(http.StatusOK, response.APIResponse{

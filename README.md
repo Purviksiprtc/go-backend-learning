@@ -1,144 +1,334 @@
-User CRUD API with Soft Delete (Go + Echo + GORM)
-Overview
 
-This project implements a User CRUD REST API using Golang, Echo, GORM, and PostgreSQL, following clean architecture and production-ready best practices.
 
-The implementation incorporates all review feedback to ensure:
+# User CRUD API with RabbitMQ (Event-Driven Backend)
 
-Proper separation of concerns
+## 📌 Overview
 
-Secure handling of sensitive data
+This project is a **backend-only Go application** that demonstrates:
 
-Correct soft delete behavior
+* User CRUD operations (Create, Read, Update, Delete)
+* **Event-driven architecture using RabbitMQ**
+* Asynchronous communication between producer and consumer
+* Reliable message handling using **Ack / Nack and Dead Letter Queue**
+* Fully **Dockerized setup** (no local installations needed except Docker)
 
-Explicit error handling
+When a user is **created or updated**, an **event is published** to RabbitMQ.
+A **consumer listens** to these events and simulates:
 
-Clean API contracts
+* Sending welcome emails
+* Creating audit logs
 
-Setup Instructions
-1. Prerequisites
+---
 
-Ensure the following are installed on your system:
+## 🧠 What You Will Learn from This Project
 
-Go (v1.20 or higher)
+* How RabbitMQ works in real backend systems
+* How producers and consumers communicate
+* Why events are better than direct service calls
+* How reliable message processing is designed
+* How to observe everything using RabbitMQ Management UI
 
-PostgreSQL
+---
 
-Git
+## 🏗️ Architecture (Simple Explanation)
 
-2. Clone the Repository
-git clone https://github.com/Purviksiprtc/go-backend-learning.git
-cd go-backend-learning
+```
+Client (Postman / Browser)
+        |
+        v
+User CRUD API (Producer)
+        |
+        v
+RabbitMQ (Exchange → Queue)
+        |
+        v
+Consumer (Notification & Audit)
+```
 
-3. Configure Environment Variables
+---
 
-Create a .env file in the project root with the following content:
+## 🧩 Features Implemented
 
-DB_HOST=localhost
+### User CRUD
+
+* Create user
+* Get users
+* Update user
+* Soft delete user
+* Password hashing with bcrypt
+
+### RabbitMQ (Event Driven)
+
+* USER_CREATED event
+* USER_UPDATED event
+* Topic exchange
+* Separate queues per event
+* Manual acknowledgements
+* Dead Letter Queue (DLQ)
+
+---
+
+## 📂 Project Structure
+
+```
+user-crud-go/
+├── config/          # Database config
+├── handlers/        # User CRUD handlers
+├── models/          # Database models
+├── request/         # Request DTOs
+├── response/        # Response DTOs
+├── routes/          # API routes
+├── rabbitmq/        # RabbitMQ connection, setup, publisher
+├── consumer/        # RabbitMQ consumer (Notification & Audit)
+├── main.go          # Application entry point
+├── docker-compose.yml
+├── Dockerfile
+├── .env
+├── example.env
+├── go.mod
+├── go.sum
+└── README.md
+```
+
+---
+
+## ⚙️ Prerequisites
+
+You only need:
+
+* **Docker**
+* **Docker Compose**
+
+👉 No need to install Go, PostgreSQL, or RabbitMQ locally.
+
+---
+
+## 🚀 How to Run This Project (Step by Step)
+
+### 1️⃣ Clone the Repository
+
+```bash
+git clone <your-repository-url>
+cd user-crud-go
+```
+
+---
+
+### 2️⃣ Environment Configuration
+
+Create a `.env` file in project root:
+
+```env
+APP_PORT=8080
+
+DB_HOST=postgres
 DB_USER=postgres
 DB_PASSWORD=postgres
 DB_NAME=go_backend
 DB_PORT=5432
-APP_PORT=8080
 
+RABBITMQ_HOST=rabbitmq
+RABBITMQ_PORT=5672
+RABBITMQ_USER=guest
+RABBITMQ_PASSWORD=guest
 
-⚠️ Update the database credentials based on your local setup.
+RABBITMQ_EXCHANGE=user.events
+RABBITMQ_USER_CREATED_QUEUE=user.created.queue
+RABBITMQ_USER_UPDATED_QUEUE=user.updated.queue
+RABBITMQ_DLQ=user.dlq
+```
 
-4. Install Dependencies
-go mod tidy
+(Use `example.env` as reference)
 
-5. Run Database Migrations
+---
 
-Database tables are automatically created using GORM when the application starts.
+### 3️⃣ Start the Application
 
-6. Start the Application
-go run main.go
+```bash
+docker compose up -d --build
+```
 
+This starts:
 
-Server will start on:
+* Go application
+* PostgreSQL
+* RabbitMQ (with management UI)
 
-http://localhost:8080
+---
 
-API Endpoints
-Method	Endpoint	Description
-POST	/users	Create a new user
-GET	/users	Get all active users
-GET	/users/:id	Get a user by ID
-PUT	/users/:id	Update a user
-DELETE	/users/:id	Soft delete a user
-Key Improvements Based on PR Review
-1. Separation of API Contracts and Database Models
+## 🌐 Access URLs
 
-Introduced dedicated request DTOs under /request
+| Service        | URL                                              |
+| -------------- | ------------------------------------------------ |
+| API            | [http://localhost:8080](http://localhost:8080)   |
+| RabbitMQ UI    | [http://localhost:15672](http://localhost:15672) |
+| RabbitMQ Login | guest / guest                                    |
 
-Introduced dedicated response DTOs under /response
+---
 
-API handlers do not bind or return database models directly
+## 🧪 How to Test & Observe (VERY IMPORTANT)
 
-Explicit mapping performed:
+### 🔹 Step 1: Observe RabbitMQ BEFORE API call
 
-Request → Model
+1. Open RabbitMQ UI
+   👉 [http://localhost:15672](http://localhost:15672)
+2. Go to **Queues**
 
-Model → Response
+You should see:
 
-2. Proper Soft Delete Implementation
+* `user.created.queue` → 0 messages
+* `user.updated.queue` → 0 messages
+* `user.dlq` → 0 messages
 
-Implemented soft delete using gorm.DeletedAt
+This is the **initial state**.
 
-All read operations filter records using:
+---
 
-deleted_at IS NULL
+### 🔹 Step 2: Create User (USER_CREATED event)
 
+Send request:
 
-Delete operations mark records as deleted instead of removing them
+```http
+POST http://localhost:8080/users
+```
 
-Ensures deleted users never appear in API responses
+```json
+{
+  "name": "Rahul",
+  "email": "rahul@test.com",
+  "password": "123"
+}
+```
 
-3. Email Uniqueness Handled in Application Logic
+---
 
-Removed database-level unique constraint
+### 🔹 Step 3: Observe Logs (MOST IMPORTANT)
 
-Email uniqueness enforced manually:
+```bash
+docker logs -f user-crud-app
+```
 
-Create User checks for existing active users
+You should see:
 
-Update User checks excluding the current user
+```
+[USER_CREATED] Welcome email sent to rahul@test.com
+[USER_CREATED] Audit log created for user 1
+```
 
-Allows reuse of emails after soft deletion
+✔ This proves RabbitMQ is working.
 
-4. Secure Password Handling
+---
 
-Passwords are hashed using bcrypt
+### 🔹 Step 4: Observe RabbitMQ UI
 
-Bcrypt errors are explicitly handled
+* `user.created.queue` briefly receives message
+* Consumer ACKs it
+* Queue count returns to **0**
 
-Password field removed from API responses
+👉 **0 messages = SUCCESS**
 
-Password is never exposed in any response
+---
 
-5. Explicit Database Error Handling
+### 🔹 Step 5: Update User (USER_UPDATED event)
 
-All database operations handle .Error
+```http
+PUT http://localhost:8080/users/1
+```
 
-API returns appropriate HTTP errors
+```json
+{
+  "name": "Rahul Sharma",
+  "email": "rahul@test.com"
+}
+```
 
-Prevents silent failures and misleading success responses
+Logs:
 
-6. Environment-Based Configuration
+```
+[USER_UPDATED] User 1 profile updated
+[USER_UPDATED] Audit log updated for rahul@test.com
+```
 
-Server port is loaded from .env
+---
 
-Improves portability across environments
+### 🔹 Step 6: Dead Letter Queue (DLQ)
 
-Folder Structure
-user-crud-go/
-├── config/        # Database configuration
-├── handlers/      # HTTP handlers
-├── models/        # Database models
-├── request/       # Request DTOs
-├── response/      # Response DTOs
-├── routes/        # Route registration
-├── main.go        # Application entry point
-├── go.mod
-├── go.sum 
+* Normally `user.dlq` = 0
+* Messages go to DLQ only if consumer fails
+* Used for debugging & reliability
 
+---
+
+## ❓ Why Queue Shows 0 Messages?
+
+Because:
+
+* Consumer is running
+* Messages are processed immediately
+* ACK deletes message
+
+👉 This is **expected and correct behavior**
+
+---
+
+## 🧠 Important Concepts (Simple)
+
+* **Producer**: User CRUD API (publishes events)
+* **RabbitMQ**: Message broker
+* **Consumer**: Notification & Audit service
+* **Ack**: Message processed successfully
+* **Nack**: Message failed → sent to DLQ
+
+---
+
+## 🎯 Interview-Ready Explanation
+
+**Q: Why producer and consumer are in same service?**
+
+> For learning purposes. In real production, they would be separate services, but the event-driven contract remains the same.
+
+**Q: How do you verify RabbitMQ is working?**
+
+> By observing consumer logs and message acknowledgements, not by queue message count.
+
+---
+
+## 🛑 How to Stop the Application
+
+```bash
+docker compose down
+```
+
+---
+
+## ✅ Final Notes
+
+* Backend-only project
+* No frontend included
+* Clean, production-style RabbitMQ usage
+* Suitable for interviews and real-world learning
+
+---
+
+## 🎉 Conclusion
+
+This project demonstrates a **real event-driven backend system** using:
+
+* Go
+* RabbitMQ
+* PostgreSQL
+* Docker
+
+✔ Not beginner-level
+✔ Industry-relevant
+✔ Interview-ready
+
+---
+
+If you want, I can also provide:
+
+* **Architecture diagram (text)**
+* **Interview Q&A**
+* **Troubleshooting guide**
+
+Just tell me 👍
