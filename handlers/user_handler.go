@@ -20,6 +20,8 @@ import (
 
 func CreateUser(c echo.Context) error {
 	req := new(request.CreateUserRequest)
+
+	// Bind request
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, response.APIResponse{
 			Status:  "error",
@@ -27,13 +29,15 @@ func CreateUser(c echo.Context) error {
 		})
 	}
 
-	if req.Name == "" || req.Email == "" || req.Password == "" {
+	// ✅ Structured validation (replaces manual field checks)
+	if err := c.Validate(req); err != nil {
 		return c.JSON(http.StatusBadRequest, response.APIResponse{
 			Status:  "error",
-			Message: "name, email, and password are required",
+			Message: err.Error(),
 		})
 	}
 
+	// Check email uniqueness
 	var existingUser models.User
 	if err := config.DB.
 		Where("email = ? AND deleted_at IS NULL", req.Email).
@@ -44,6 +48,7 @@ func CreateUser(c echo.Context) error {
 		})
 	}
 
+	// Hash password
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), 10)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, response.APIResponse{
@@ -58,6 +63,7 @@ func CreateUser(c echo.Context) error {
 		Password: string(hash),
 	}
 
+	// Save user
 	if err := config.DB.Create(&user).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, response.APIResponse{
 			Status:  "error",
@@ -213,10 +219,19 @@ func UpdateUser(c echo.Context) error {
 	}
 
 	req := new(request.UpdateUserRequest)
+
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, response.APIResponse{
 			Status:  "error",
 			Message: "Invalid request body",
+		})
+	}
+
+	// ✅ Structured validation
+	if err := c.Validate(req); err != nil {
+		return c.JSON(http.StatusBadRequest, response.APIResponse{
+			Status:  "error",
+			Message: err.Error(),
 		})
 	}
 
