@@ -4,6 +4,8 @@ import (
 	"log"
 	"os"
 
+	"github.com/go-playground/validator/v10"
+
 	"user-crud-go/config"
 	"user-crud-go/models"
 	"user-crud-go/routes"
@@ -16,6 +18,9 @@ func main() {
 	config.DB.AutoMigrate(&models.User{})
 
 	e := echo.New()
+	e.Validator = &config.CustomValidator{
+		Validator: validator.New(),
+	}
 	routes.RegisterRoutes(e)
 
 	port := os.Getenv("APP_PORT")

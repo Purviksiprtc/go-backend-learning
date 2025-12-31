@@ -17,6 +17,7 @@ import (
 
 func CreateUser(c echo.Context) error {
 	req := new(request.CreateUserRequest)
+
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, response.APIResponse{
 			Status:  "error",
@@ -24,10 +25,11 @@ func CreateUser(c echo.Context) error {
 		})
 	}
 
-	if req.Name == "" || req.Email == "" || req.Password == "" {
+	// ✅ Structured validation
+	if err := c.Validate(req); err != nil {
 		return c.JSON(http.StatusBadRequest, response.APIResponse{
 			Status:  "error",
-			Message: "name, email, and password are required",
+			Message: err.Error(),
 		})
 	}
 
@@ -74,12 +76,11 @@ func CreateUser(c echo.Context) error {
 }
 
 /* ---------------- GET ALL USERS ---------------- */
+
 func GetUsers(c echo.Context) error {
-	// Defaults
 	page := 1
 	perPage := 10
 
-	// Query params
 	name := c.QueryParam("name")
 	email := c.QueryParam("email")
 
@@ -90,23 +91,14 @@ func GetUsers(c echo.Context) error {
 		fmt.Sscanf(pp, "%d", &perPage)
 	}
 
-	if page < 1 {
-		page = 1
-	}
-	if perPage < 1 {
-		perPage = 10
-	}
-
 	offset := (page - 1) * perPage
 
 	var users []models.User
 	var total int64
 
-	// Base query (soft delete excluded)
 	query := config.DB.Model(&models.User{}).
 		Where("deleted_at IS NULL")
 
-	// Apply filters
 	if name != "" {
 		query = query.Where("name ILIKE ?", "%"+name+"%")
 	}
@@ -114,7 +106,6 @@ func GetUsers(c echo.Context) error {
 		query = query.Where("email ILIKE ?", "%"+email+"%")
 	}
 
-	// Count
 	if err := query.Count(&total).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, response.APIResponse{
 			Status:  "error",
@@ -122,7 +113,6 @@ func GetUsers(c echo.Context) error {
 		})
 	}
 
-	// Fetch paginated data
 	if err := query.
 		Limit(perPage).
 		Offset(offset).
@@ -133,7 +123,6 @@ func GetUsers(c echo.Context) error {
 		})
 	}
 
-	// Map response
 	data := make([]response.UserResponse, 0)
 	for _, u := range users {
 		data = append(data, response.UserResponse{
@@ -207,6 +196,14 @@ func UpdateUser(c echo.Context) error {
 		})
 	}
 
+	// ✅ Structured validation
+	if err := c.Validate(req); err != nil {
+		return c.JSON(http.StatusBadRequest, response.APIResponse{
+			Status:  "error",
+			Message: err.Error(),
+		})
+	}
+
 	var existingUser models.User
 	if err := config.DB.
 		Where("email = ? AND id != ? AND deleted_at IS NULL", req.Email, user.ID).
@@ -220,7 +217,6 @@ func UpdateUser(c echo.Context) error {
 	user.Name = req.Name
 	user.Email = req.Email
 
-	// ✅ Password update support
 	if req.Password != "" {
 		hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), 10)
 		if err != nil {
