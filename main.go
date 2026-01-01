@@ -15,11 +15,11 @@ import (
 )
 
 func main() {
-	// 🔹 DB setup
+	// 🔹 DB setup (needed for both API & Consumer)
 	config.ConnectDB()
 	config.DB.AutoMigrate(&models.User{})
 
-	// 🔹 RabbitMQ connection
+	// 🔹 RabbitMQ connection (needed for both)
 	if err := rabbitmq.ConnectRabbitMQ(); err != nil {
 		log.Fatalf("RabbitMQ connection failed: %v", err)
 	}
@@ -28,28 +28,48 @@ func main() {
 		log.Fatalf("RabbitMQ setup failed: %v", err)
 	}
 
-	if err := consumer.StartConsumer(rabbitmq.Channel); err != nil {
-		log.Fatalf("Consumer failed to start: %v", err)
+	// 🔹 Decide runtime mode
+	appMode := os.Getenv("APP_MODE")
+	if appMode == "" {
+		appMode = "api" // default safety
 	}
 
-	// 🔹 Echo setup
-	e := echo.New()
+	// =========================================================
+	// 🔹 CONSUMER MODE
+	// =========================================================
+	if appMode == "consumer" {
+		log.Println("Starting application in CONSUMER mode")
 
-	// ✅ Structured request validation (PR requirement)
-	e.Validator = &config.CustomValidator{
-		Validator: validator.New(),
+		if err := consumer.StartConsumer(rabbitmq.Channel); err != nil {
+			log.Fatalf("Consumer failed to start: %v", err)
+		}
+
+		// Block forever so container doesn’t exit
+		select {}
 	}
 
-	// 🔹 Routes
-	routes.RegisterRoutes(e)
+	// =========================================================
+	// 🔹 API MODE
+	// =========================================================
+	if appMode == "api" {
+		log.Println("Starting application in API mode")
 
-	// 🔹 Server start
-	port := os.Getenv("APP_PORT")
-	if port == "" {
-		port = "8080"
-	}
+		e := echo.New()
 
-	if err := e.Start(":" + port); err != nil {
-		log.Fatalf("failed to start server: %v", err)
+		// Structured request validation (PR requirement)
+		e.Validator = &config.CustomValidator{
+			Validator: validator.New(),
+		}
+
+		routes.RegisterRoutes(e)
+
+		port := os.Getenv("APP_PORT")
+		if port == "" {
+			port = "8080"
+		}
+
+		if err := e.Start(":" + port); err != nil {
+			log.Fatalf("failed to start server: %v", err)
+		}
 	}
 }

@@ -26,20 +26,37 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  app:
+  # ================= API SERVICE =================
+  app-api:
     build: .
-    container_name: user-crud-app
+    container_name: user-crud-api
     ports:
       - "8080:8080"
     env_file:
       - .env
+    environment:
+      APP_MODE: api
     depends_on:
       rabbitmq:
         condition: service_healthy
       postgres:
         condition: service_started
-    restart: unless-stopped 
+    restart: unless-stopped
 
+  # ================= CONSUMER SERVICE =================
+  app-consumer:
+    build: .
+    container_name: user-crud-consumer
+    env_file:
+      - .env
+    environment:
+      APP_MODE: consumer
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_started
+    restart: unless-stopped
 
 volumes:
   postgres_data:

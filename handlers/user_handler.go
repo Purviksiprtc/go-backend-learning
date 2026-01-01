@@ -21,7 +21,6 @@ import (
 func CreateUser(c echo.Context) error {
 	req := new(request.CreateUserRequest)
 
-	// Bind request
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, response.APIResponse{
 			Status:  "error",
@@ -29,7 +28,7 @@ func CreateUser(c echo.Context) error {
 		})
 	}
 
-	// ✅ Structured validation (replaces manual field checks)
+	// Structured validation
 	if err := c.Validate(req); err != nil {
 		return c.JSON(http.StatusBadRequest, response.APIResponse{
 			Status:  "error",
@@ -37,7 +36,6 @@ func CreateUser(c echo.Context) error {
 		})
 	}
 
-	// Check email uniqueness
 	var existingUser models.User
 	if err := config.DB.
 		Where("email = ? AND deleted_at IS NULL", req.Email).
@@ -48,7 +46,6 @@ func CreateUser(c echo.Context) error {
 		})
 	}
 
-	// Hash password
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), 10)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, response.APIResponse{
@@ -63,7 +60,6 @@ func CreateUser(c echo.Context) error {
 		Password: string(hash),
 	}
 
-	// Save user
 	if err := config.DB.Create(&user).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, response.APIResponse{
 			Status:  "error",
@@ -71,7 +67,7 @@ func CreateUser(c echo.Context) error {
 		})
 	}
 
-	// 🔔 USER_CREATED EVENT
+	// USER_CREATED event
 	event := rabbitmq.UserEvent{
 		Event:     "USER_CREATED",
 		Version:   "1.0",
@@ -153,9 +149,9 @@ func GetUsers(c echo.Context) error {
 		})
 	}
 
-	data := make([]response.UserResponse, 0)
+	userResponses := make([]response.UserResponse, 0)
 	for _, u := range users {
-		data = append(data, response.UserResponse{
+		userResponses = append(userResponses, response.UserResponse{
 			ID:    u.ID,
 			Name:  u.Name,
 			Email: u.Email,
@@ -164,17 +160,18 @@ func GetUsers(c echo.Context) error {
 
 	lastPage := int((total + int64(perPage) - 1) / int64(perPage))
 
+	// ✅ UPDATED RESPONSE STRUCTURE (PR FIX)
 	return c.JSON(http.StatusOK, response.APIResponse{
 		Status:  "success",
 		Message: "Users fetched successfully",
 		Data: map[string]interface{}{
-			"users": data,
 			"pagination": response.Pagination{
 				CurrentPage:  page,
 				PerPage:      perPage,
 				LastPage:     lastPage,
 				TotalResults: int(total),
 			},
+			"users": userResponses,
 		},
 	})
 }
@@ -227,7 +224,6 @@ func UpdateUser(c echo.Context) error {
 		})
 	}
 
-	// ✅ Structured validation
 	if err := c.Validate(req); err != nil {
 		return c.JSON(http.StatusBadRequest, response.APIResponse{
 			Status:  "error",
@@ -266,7 +262,7 @@ func UpdateUser(c echo.Context) error {
 		})
 	}
 
-	// 🔔 USER_UPDATED EVENT
+	// USER_UPDATED event
 	event := rabbitmq.UserEvent{
 		Event:     "USER_UPDATED",
 		Version:   "1.0",
