@@ -25,7 +25,7 @@ func CreateUser(c echo.Context) error {
 		})
 	}
 
-	// ✅ Structured validation
+	// Structured validation
 	if err := c.Validate(req); err != nil {
 		return c.JSON(http.StatusBadRequest, response.APIResponse{
 			Status:  "error",
@@ -75,7 +75,7 @@ func CreateUser(c echo.Context) error {
 	})
 }
 
-/* ---------------- GET ALL USERS ---------------- */
+/* ---------------- GET ALL USERS (WITH PAGINATION) ---------------- */
 
 func GetUsers(c echo.Context) error {
 	page := 1
@@ -89,6 +89,14 @@ func GetUsers(c echo.Context) error {
 	}
 	if pp := c.QueryParam("per_page"); pp != "" {
 		fmt.Sscanf(pp, "%d", &perPage)
+	}
+
+	// Safety checks
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 {
+		perPage = 10
 	}
 
 	offset := (page - 1) * perPage
@@ -123,9 +131,9 @@ func GetUsers(c echo.Context) error {
 		})
 	}
 
-	data := make([]response.UserResponse, 0)
+	userResponses := make([]response.UserResponse, 0)
 	for _, u := range users {
-		data = append(data, response.UserResponse{
+		userResponses = append(userResponses, response.UserResponse{
 			ID:    u.ID,
 			Name:  u.Name,
 			Email: u.Email,
@@ -138,13 +146,13 @@ func GetUsers(c echo.Context) error {
 		Status:  "success",
 		Message: "Users fetched successfully",
 		Data: map[string]interface{}{
-			"users": data,
 			"pagination": response.Pagination{
 				CurrentPage:  page,
 				PerPage:      perPage,
 				LastPage:     lastPage,
 				TotalResults: int(total),
 			},
+			"users": userResponses,
 		},
 	})
 }
@@ -181,7 +189,9 @@ func UpdateUser(c echo.Context) error {
 	id := c.Param("id")
 	var user models.User
 
-	if err := config.DB.First(&user, id).Error; err != nil {
+	if err := config.DB.
+		Where("deleted_at IS NULL").
+		First(&user, id).Error; err != nil {
 		return c.JSON(http.StatusNotFound, response.APIResponse{
 			Status:  "error",
 			Message: "User not found",
@@ -196,7 +206,6 @@ func UpdateUser(c echo.Context) error {
 		})
 	}
 
-	// ✅ Structured validation
 	if err := c.Validate(req); err != nil {
 		return c.JSON(http.StatusBadRequest, response.APIResponse{
 			Status:  "error",
@@ -252,7 +261,9 @@ func DeleteUser(c echo.Context) error {
 	id := c.Param("id")
 	var user models.User
 
-	if err := config.DB.First(&user, id).Error; err != nil {
+	if err := config.DB.
+		Where("deleted_at IS NULL").
+		First(&user, id).Error; err != nil {
 		return c.JSON(http.StatusNotFound, response.APIResponse{
 			Status:  "error",
 			Message: "User not found",
