@@ -1,144 +1,230 @@
-User CRUD API with Soft Delete (Go + Echo + GORM)
-Overview
+What I Have Implemented 
+🔹 1. RESTful User CRUD API
 
-This project implements a User CRUD REST API using Golang, Echo, GORM, and PostgreSQL, following clean architecture and production-ready best practices.
+Create User
 
-The implementation incorporates all review feedback to ensure:
+Get All Users (with pagination & filtering)
 
-Proper separation of concerns
+Get User by ID
 
-Secure handling of sensitive data
+Update User
 
-Correct soft delete behavior
+Delete User (Soft Delete)
 
-Explicit error handling
+🔹 2. Clean Project Structure
+user-crud-go/
+│── config/        → Database & validator configuration
+│── handlers/      → API request handling (business logic)
+│── models/        → Database models (GORM)
+│── request/       → Request DTOs
+│── response/      → Response DTOs & pagination
+│── routes/        → API route registration
+│── messaging/     → RabbitMQ / Paota integration
+│── main.go        → Application entry point
 
-Clean API contracts
+🔹 3. PostgreSQL Database Integration
 
-Setup Instructions
-1. Prerequisites
+Connected PostgreSQL using GORM
 
-Ensure the following are installed on your system:
+Auto-migration for User table
 
-Go (v1.20 or higher)
+Soft delete support using gorm.DeletedAt
+
+Email uniqueness enforcement
+
+🔹 4. Secure Password Handling
+
+Password hashing using bcrypt
+
+Password never exposed in API responses
+
+User responses return only:
+
+id
+
+name
+
+email
+
+🔹 5. Request Validation
+
+Structured request validation using:
+
+github.com/go-playground/validator/v10
+
+
+Validation errors returned as proper HTTP responses
+
+🔹 6. Pagination & Filtering
+
+Pagination support:
+
+page
+
+limit
+
+Filtering:
+
+by name
+
+by email
+
+Pagination metadata returned in response
+
+🔹 7. Soft Delete Implementation
+
+Users are not permanently removed
+
+Deleted users are excluded from:
+
+Get All
+
+Get by ID
+
+Enables future recovery & audit safety
+
+🔹 8. Event-Driven Architecture (RabbitMQ)
+
+Events published after successful DB operations
+
+Implemented two events:
+
+USER_CREATED
+
+USER_UPDATED
+
+🔹 9. Paota-Based Messaging (Phase 2)
+
+Replaced raw RabbitMQ implementation with Paota abstraction
+
+Used Paota Publisher & WorkerPool
+
+Messaging layer isolated (no business logic changes)
+
+Durable exchange & queues
+
+Persistent messages
+
+Dead Letter Queue (DLQ) support
+
+🔹 10. Environment-Based Configuration
+
+All configs loaded from .env
+
+No hardcoded credentials
+
+Supports easy deployment & scaling
+
+🔹 11. Production-Grade Code Quality
+
+Clean error handling
+
+Standard API responses
+
+Modular design
+
+Build-safe (go build ./... passes)
+
+Ready for CI/CD pipelines
+
+🚀 How to Run This Project
+1️⃣ Prerequisites
+
+Make sure you have installed:
+
+Go 1.21+
 
 PostgreSQL
 
-Git
+RabbitMQ
 
-2. Clone the Repository
-git clone https://github.com/Purviksiprtc/go-backend-learning.git
-cd go-backend-learning
+2️⃣ Clone the Repository
+git clone <repository-url>
+cd user-crud-go
 
-3. Configure Environment Variables
+3️⃣ Configure Environment Variables
 
-Create a .env file in the project root with the following content:
+Create .env file:
 
 DB_HOST=localhost
+DB_PORT=5432
 DB_USER=postgres
 DB_PASSWORD=postgres
-DB_NAME=go_backend
-DB_PORT=5432
+DB_NAME=userdb
+
 APP_PORT=8080
 
+RABBITMQ_URL=amqp://guest:guest@localhost:5672/
+RABBITMQ_EXCHANGE=user.events
 
-⚠️ Update the database credentials based on your local setup.
-
-4. Install Dependencies
+4️⃣ Install Dependencies
 go mod tidy
 
-5. Run Database Migrations
+5️⃣ Build the Project (Recommended)
+go build ./...
 
-Database tables are automatically created using GORM when the application starts.
 
-6. Start the Application
+✔ Ensures entire project is error-free
+
+6️⃣ Run the Application
 go run main.go
 
 
-Server will start on:
+Server starts on:
 
 http://localhost:8080
 
-API Endpoints
-Method	Endpoint	Description
-POST	/users	Create a new user
-GET	/users	Get all active users
-GET	/users/:id	Get a user by ID
-PUT	/users/:id	Update a user
-DELETE	/users/:id	Soft delete a user
-Key Improvements Based on PR Review
-1. Separation of API Contracts and Database Models
-
-Introduced dedicated request DTOs under /request
-
-Introduced dedicated response DTOs under /response
-
-API handlers do not bind or return database models directly
-
-Explicit mapping performed:
-
-Request → Model
-
-Model → Response
-
-2. Proper Soft Delete Implementation
-
-Implemented soft delete using gorm.DeletedAt
-
-All read operations filter records using:
-
-deleted_at IS NULL
+📡 API Endpoints
+➕ Create User
+POST /users
 
 
-Delete operations mark records as deleted instead of removing them
+Request Body
 
-Ensures deleted users never appear in API responses
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "password": "password123"
+}
 
-3. Email Uniqueness Handled in Application Logic
+📄 Get All Users
+GET /users?page=1&limit=10
 
-Removed database-level unique constraint
+🔍 Get User by ID
+GET /users/{id}
 
-Email uniqueness enforced manually:
+✏ Update User
+PUT /users/{id}
 
-Create User checks for existing active users
+❌ Delete User (Soft Delete)
+DELETE /users/{id}
 
-Update User checks excluding the current user
+👀 What Output Should Be Observed
+✅ API Responses
 
-Allows reuse of emails after soft deletion
+Proper JSON responses with status & message
 
-4. Secure Password Handling
+Pagination metadata for list APIs
 
-Passwords are hashed using bcrypt
+No password exposure
 
-Bcrypt errors are explicitly handled
+✅ Database
 
-Password field removed from API responses
+Users stored in PostgreSQL
 
-Password is never exposed in any response
+Deleted users marked with deleted_at
 
-5. Explicit Database Error Handling
+No hard delete
 
-All database operations handle .Error
+✅ RabbitMQ
 
-API returns appropriate HTTP errors
+Events published on:
 
-Prevents silent failures and misleading success responses
+user.created
 
-6. Environment-Based Configuration
+user.updated
 
-Server port is loaded from .env
+Messages visible in queues
 
-Improves portability across environments
-
-Folder Structure
-user-crud-go/
-├── config/        # Database configuration
-├── handlers/      # HTTP handlers
-├── models/        # Database models
-├── request/       # Request DTOs
-├── response/      # Response DTOs
-├── routes/        # Route registration
-├── main.go        # Application entry point
-├── go.mod
-├── go.sum 
+DLQ captures failed messages
 

@@ -3,11 +3,14 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	"user-crud-go/config"
 	"user-crud-go/models"
 	"user-crud-go/request"
 	"user-crud-go/response"
+
+	"user-crud-go/messaging/paota" // ✅ Paota messaging
 
 	"github.com/labstack/echo/v4"
 	"golang.org/x/crypto/bcrypt"
@@ -25,7 +28,6 @@ func CreateUser(c echo.Context) error {
 		})
 	}
 
-	// Structured validation
 	if err := c.Validate(req); err != nil {
 		return c.JSON(http.StatusBadRequest, response.APIResponse{
 			Status:  "error",
@@ -64,6 +66,21 @@ func CreateUser(c echo.Context) error {
 		})
 	}
 
+	/* ✅ PAOTA EVENT: USER_CREATED */
+	producer, err := paota.NewEventProducer(
+		os.Getenv("RABBITMQ_USER_CREATED_QUEUE"),
+		"user.created",
+	)
+	if err == nil {
+		_ = producer.PublishUserEvent(
+			"USER_CREATED",
+			user.ID,
+			user.Name,
+			user.Email,
+			"user.created",
+		)
+	}
+
 	return c.JSON(http.StatusCreated, response.APIResponse{
 		Status:  "success",
 		Message: "User created successfully",
@@ -75,7 +92,7 @@ func CreateUser(c echo.Context) error {
 	})
 }
 
-/* ---------------- GET ALL USERS (WITH PAGINATION) ---------------- */
+/* ---------------- GET ALL USERS ---------------- */
 
 func GetUsers(c echo.Context) error {
 	page := 1
@@ -91,7 +108,6 @@ func GetUsers(c echo.Context) error {
 		fmt.Sscanf(pp, "%d", &perPage)
 	}
 
-	// Safety checks
 	if page < 1 {
 		page = 1
 	}
@@ -121,10 +137,7 @@ func GetUsers(c echo.Context) error {
 		})
 	}
 
-	if err := query.
-		Limit(perPage).
-		Offset(offset).
-		Find(&users).Error; err != nil {
+	if err := query.Limit(perPage).Offset(offset).Find(&users).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, response.APIResponse{
 			Status:  "error",
 			Message: "Failed to fetch users",
@@ -242,6 +255,21 @@ func UpdateUser(c echo.Context) error {
 			Status:  "error",
 			Message: "Failed to update user",
 		})
+	}
+
+	/* ✅ PAOTA EVENT: USER_UPDATED */
+	producer, err := paota.NewEventProducer(
+		os.Getenv("RABBITMQ_USER_UPDATED_QUEUE"),
+		"user.updated",
+	)
+	if err == nil {
+		_ = producer.PublishUserEvent(
+			"USER_UPDATED",
+			user.ID,
+			user.Name,
+			user.Email,
+			"user.updated",
+		)
 	}
 
 	return c.JSON(http.StatusOK, response.APIResponse{
