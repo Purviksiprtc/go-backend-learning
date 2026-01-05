@@ -17,8 +17,9 @@ func LoadPaotaConfig(queueName, bindingKey string) config.Config {
 			BindingKey:         bindingKey,
 			PrefetchCount:      10,
 			ConnectionPoolSize: 5,
-			DelayedQueue:       os.Getenv("RABBITMQ_DLQ"),
-			FailedQueue:        os.Getenv("RABBITMQ_DLQ"),
+
+			// ✅ DLQ ONLY FOR MAIN QUEUES
+			FailedQueue: os.Getenv("RABBITMQ_DLQ"),
 		},
 	}
 }
