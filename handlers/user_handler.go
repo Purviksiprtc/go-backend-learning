@@ -10,7 +10,7 @@ import (
 	"user-crud-go/request"
 	"user-crud-go/response"
 
-	"user-crud-go/messaging/paota" // ✅ Paota messaging
+	"user-crud-go/producer" // ✅ NEW: producer abstraction
 
 	"github.com/labstack/echo/v4"
 	"golang.org/x/crypto/bcrypt"
@@ -66,13 +66,13 @@ func CreateUser(c echo.Context) error {
 		})
 	}
 
-	/* ✅ PAOTA EVENT: USER_CREATED */
-	producer, err := paota.NewEventProducer(
+	/* ✅ EVENT: USER_CREATED */
+	prod, err := producer.NewUserProducer(
 		os.Getenv("RABBITMQ_USER_CREATED_QUEUE"),
 		"user.created",
 	)
 	if err == nil {
-		_ = producer.PublishUserEvent(
+		_ = prod.Publish(
 			"USER_CREATED",
 			user.ID,
 			user.Name,
@@ -257,13 +257,13 @@ func UpdateUser(c echo.Context) error {
 		})
 	}
 
-	/* ✅ PAOTA EVENT: USER_UPDATED */
-	producer, err := paota.NewEventProducer(
+	/* ✅ EVENT: USER_UPDATED */
+	prod, err := producer.NewUserProducer(
 		os.Getenv("RABBITMQ_USER_UPDATED_QUEUE"),
 		"user.updated",
 	)
 	if err == nil {
-		_ = producer.PublishUserEvent(
+		_ = prod.Publish(
 			"USER_UPDATED",
 			user.ID,
 			user.Name,

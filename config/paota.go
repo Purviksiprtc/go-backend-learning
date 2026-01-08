@@ -1,4 +1,4 @@
-package paota
+package config
 
 import (
 	"os"
@@ -6,10 +6,10 @@ import (
 	"github.com/surendratiwari3/paota/config"
 )
 
-func LoadPaotaConfig(queueName, bindingKey string) config.Config {
+func LoadPaota(queue, bindingKey string) config.Config {
 	return config.Config{
 		Broker:        "amqp",
-		TaskQueueName: queueName,
+		TaskQueueName: queue,
 		AMQP: &config.AMQPConfig{
 			Url:                os.Getenv("RABBITMQ_URL"),
 			Exchange:           os.Getenv("RABBITMQ_EXCHANGE"),
@@ -17,9 +17,7 @@ func LoadPaotaConfig(queueName, bindingKey string) config.Config {
 			BindingKey:         bindingKey,
 			PrefetchCount:      10,
 			ConnectionPoolSize: 5,
-
-			// ✅ DLQ ONLY FOR MAIN QUEUES
-			FailedQueue: os.Getenv("RABBITMQ_DLQ"),
+			FailedQueue:        os.Getenv("RABBITMQ_DLQ"),
 		},
 	}
 }
