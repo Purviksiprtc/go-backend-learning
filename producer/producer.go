@@ -21,7 +21,7 @@ type UserProducer struct {
 func NewUserCreatedProducer() (*UserProducer, error) {
 	queue := os.Getenv("USER_CREATED_QUEUE")
 
-	cfg := appConfig.LoadPaota(queue, "user.created")
+	cfg := appConfig.LoadPaotaConfig(queue, "user.created")
 
 	wp, err := workerpool.NewWorkerPoolWithConfig(
 		context.Background(),
@@ -41,7 +41,7 @@ func NewUserCreatedProducer() (*UserProducer, error) {
 func NewUserUpdatedProducer() (*UserProducer, error) {
 	queue := os.Getenv("USER_UPDATED_QUEUE")
 
-	cfg := appConfig.LoadPaota(queue, "user.updated")
+	cfg := appConfig.LoadPaotaConfig(queue, "user.updated")
 
 	wp, err := workerpool.NewWorkerPoolWithConfig(
 		context.Background(),

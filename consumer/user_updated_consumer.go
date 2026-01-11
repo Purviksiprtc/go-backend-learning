@@ -3,7 +3,6 @@ package consumer
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 
 	appConfig "user-crud-go/config"
@@ -14,31 +13,48 @@ import (
 )
 
 func StartUserUpdatedConsumer() {
-	cfg := appConfig.LoadPaota(
-		"user.updated.queue",
+
+	cfg := appConfig.LoadPaotaConfig(
+		appConfig.GetEnv("USER_UPDATED_QUEUE"),
 		"user.updated",
 	)
 
+	// 🔥 REQUIRED
 	if err := paotaConfig.GetConfigProvider().SetApplicationConfig(cfg); err != nil {
-		log.Fatal(err)
+		log.Fatalf("❌ Failed to set paota config: %v", err)
 	}
 
-	wp, _ := workerpool.NewWorkerPool(context.Background(), 10, "user-updated")
+	wp, err := workerpool.NewWorkerPool(
+		context.Background(),
+		10,
+		"user-updated-consumer",
+	)
+	if err != nil {
+		log.Fatalf("❌ Failed to create worker pool: %v", err)
+	}
 
-	wp.RegisterTasks(map[string]interface{}{
+	if err := wp.RegisterTasks(map[string]interface{}{
 		"USER_UPDATED": handleUserUpdated,
-	})
+	}); err != nil {
+		log.Fatalf("❌ Failed to register task: %v", err)
+	}
 
-	log.Println("USER_UPDATED consumer started")
-	wp.Start()
+	log.Println("📨 USER_UPDATED consumer started")
+	if err := wp.Start(); err != nil {
+		log.Fatalf("❌ Failed to start worker pool: %v", err)
+	}
 }
 
-func handleUserUpdated(sig *schema.Signature) error {
+func handleUserUpdated(task *schema.Signature) error {
 	var payload map[string]interface{}
-	json.Unmarshal(sig.RawArgs, &payload)
 
-	id := payload["data"].(map[string]interface{})["user_id"]
-	fmt.Println("USER UPDATED EVENT RECEIVED →", id)
+	if err := json.Unmarshal(task.RawArgs, &payload); err != nil {
+		return err
+	}
 
+	data := payload["data"].(map[string]interface{})
+	id := int(data["user_id"].(float64))
+
+	log.Printf("✅ USER_UPDATED received → user %d updated\n", id)
 	return nil
 }

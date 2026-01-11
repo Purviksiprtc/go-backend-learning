@@ -7,44 +7,60 @@ import (
 	"github.com/streadway/amqp"
 )
 
-func SetupRabbitMQQueues() {
+func SetupQueues() {
 	conn, err := amqp.Dial(os.Getenv("RABBITMQ_URL"))
 	if err != nil {
-		log.Fatalf("RabbitMQ connection failed: %v", err)
+		log.Fatal(err)
 	}
 	defer conn.Close()
 
 	ch, err := conn.Channel()
 	if err != nil {
-		log.Fatalf("RabbitMQ channel failed: %v", err)
+		log.Fatal(err)
 	}
 	defer ch.Close()
 
-	// USER CREATED queues
-	declareQueue(ch, "user.created.queue")
-	declareQueue(ch, "user.created.delay.queue")
-	declareQueue(ch, "user.created.timeout.queue")
-	declareQueue(ch, "user.created.failed.queue")
+	exchange := os.Getenv("RABBITMQ_EXCHANGE")
 
-	// USER UPDATED queues
-	declareQueue(ch, "user.updated.queue")
-	declareQueue(ch, "user.updated.delay.queue")
-	declareQueue(ch, "user.updated.timeout.queue")
-	declareQueue(ch, "user.updated.failed.queue")
-
-	log.Println("RabbitMQ queues created successfully")
-}
-
-func declareQueue(ch *amqp.Channel, name string) {
-	_, err := ch.QueueDeclare(
-		name,
-		true,  // durable
-		false, // auto delete
-		false, // exclusive
-		false, // no wait
+	// exchange
+	err = ch.ExchangeDeclare(
+		exchange,
+		"topic",
+		true,
+		false,
+		false,
+		false,
 		nil,
 	)
 	if err != nil {
-		log.Fatalf("Failed to declare queue %s: %v", name, err)
+		log.Fatal(err)
+	}
+
+	// 🔥 ONLY declare delay / timeout / failed queues
+	declareDLXQueue(ch, os.Getenv("USER_CREATED_DELAY_QUEUE"), exchange, "user.created")
+	declareDLXQueue(ch, os.Getenv("USER_CREATED_TIMEOUT_QUEUE"), exchange, "user.created")
+	declareDLXQueue(ch, os.Getenv("USER_CREATED_FAILED_QUEUE"), exchange, "user.created")
+
+	declareDLXQueue(ch, os.Getenv("USER_UPDATED_DELAY_QUEUE"), exchange, "user.updated")
+	declareDLXQueue(ch, os.Getenv("USER_UPDATED_TIMEOUT_QUEUE"), exchange, "user.updated")
+	declareDLXQueue(ch, os.Getenv("USER_UPDATED_FAILED_QUEUE"), exchange, "user.updated")
+
+	log.Println("✅ RabbitMQ queues initialized (manager-style)")
+}
+
+func declareDLXQueue(ch *amqp.Channel, name, exchange, routingKey string) {
+	_, err := ch.QueueDeclare(
+		name,
+		true,
+		false,
+		false,
+		false,
+		amqp.Table{
+			"x-dead-letter-exchange":    exchange,
+			"x-dead-letter-routing-key": routingKey,
+		},
+	)
+	if err != nil {
+		log.Fatal(err)
 	}
 }

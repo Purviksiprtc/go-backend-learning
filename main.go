@@ -17,8 +17,8 @@ import (
 func main() {
 	godotenv.Load()
 
-	// 🔥 CREATE QUEUES FIRST (manager requirement)
-	config.SetupRabbitMQQueues()
+	// MUST run once
+	config.SetupQueues()
 
 	mode := os.Getenv("APP_MODE")
 	if mode == "" {
@@ -38,13 +38,25 @@ func main() {
 }
 
 func startAPI() {
+	// Database
 	config.ConnectDB()
-	config.DB.AutoMigrate(&models.User{})
+	if err := config.DB.AutoMigrate(&models.User{}); err != nil {
+		log.Fatalf("❌ Migration failed: %v", err)
+	}
 
+	// Echo
 	e := echo.New()
-	e.Validator = &config.CustomValidator{Validator: validator.New()}
+	e.Validator = &config.CustomValidator{
+		Validator: validator.New(),
+	}
+
 	routes.RegisterRoutes(e)
 
-	log.Println("API server started on port 8080")
-	e.Start(":8080")
+	port := os.Getenv("APP_PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Printf("🚀 API server started on port %s\n", port)
+	log.Fatal(e.Start(":" + port))
 }
