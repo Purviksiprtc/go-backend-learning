@@ -3,9 +3,10 @@ package producer
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"time"
 
-	"user-crud-go/config"
+	appConfig "user-crud-go/config"
 
 	"github.com/surendratiwari3/paota/schema"
 	"github.com/surendratiwari3/paota/workerpool"
@@ -15,8 +16,12 @@ type UserProducer struct {
 	pool *workerpool.Pool
 }
 
-func NewUserProducer(queue, routingKey string) (*UserProducer, error) {
-	cfg := config.LoadPaota(queue, routingKey)
+/* ---------- USER CREATED PRODUCER ---------- */
+
+func NewUserCreatedProducer() (*UserProducer, error) {
+	queue := os.Getenv("USER_CREATED_QUEUE")
+
+	cfg := appConfig.LoadPaota(queue, "user.created")
 
 	wp, err := workerpool.NewWorkerPoolWithConfig(
 		context.Background(),
@@ -30,6 +35,28 @@ func NewUserProducer(queue, routingKey string) (*UserProducer, error) {
 
 	return &UserProducer{pool: &wp}, nil
 }
+
+/* ---------- USER UPDATED PRODUCER ---------- */
+
+func NewUserUpdatedProducer() (*UserProducer, error) {
+	queue := os.Getenv("USER_UPDATED_QUEUE")
+
+	cfg := appConfig.LoadPaota(queue, "user.updated")
+
+	wp, err := workerpool.NewWorkerPoolWithConfig(
+		context.Background(),
+		5,
+		queue,
+		cfg,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &UserProducer{pool: &wp}, nil
+}
+
+/* ---------- PUBLISH ---------- */
 
 func (p *UserProducer) Publish(
 	event string,

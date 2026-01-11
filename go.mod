@@ -6,6 +6,7 @@ require (
 	github.com/go-playground/validator/v10 v10.30.1
 	github.com/joho/godotenv v1.5.1
 	github.com/labstack/echo/v4 v4.14.0
+	github.com/streadway/amqp v1.1.0
 	github.com/surendratiwari3/paota v1.1.11
 	golang.org/x/crypto v0.46.0
 	gorm.io/driver/postgres v1.6.0

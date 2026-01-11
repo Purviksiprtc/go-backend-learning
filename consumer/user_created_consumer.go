@@ -19,41 +19,26 @@ func StartUserCreatedConsumer() {
 		"user.created",
 	)
 
-	// Register Paota application config (REQUIRED)
 	if err := paotaConfig.GetConfigProvider().SetApplicationConfig(cfg); err != nil {
-		log.Fatalf("failed to set paota config: %v", err)
+		log.Fatal(err)
 	}
 
-	wp, err := workerpool.NewWorkerPool(
-		context.Background(),
-		10,
-		"user-created-consumer",
-	)
-	if err != nil {
-		log.Fatalf("failed to create worker pool: %v", err)
-	}
+	wp, _ := workerpool.NewWorkerPool(context.Background(), 10, "user-created")
 
-	if err := wp.RegisterTasks(map[string]interface{}{
+	wp.RegisterTasks(map[string]interface{}{
 		"USER_CREATED": handleUserCreated,
-	}); err != nil {
-		log.Fatalf("failed to register task: %v", err)
-	}
+	})
 
-	log.Println("📨 USER_CREATED consumer started")
-	if err := wp.Start(); err != nil {
-		log.Fatalf("failed to start worker pool: %v", err)
-	}
+	log.Println("USER_CREATED consumer started")
+	wp.Start()
 }
 
-func handleUserCreated(arg *schema.Signature) error {
+func handleUserCreated(sig *schema.Signature) error {
 	var payload map[string]interface{}
-	if err := json.Unmarshal(arg.RawArgs, &payload); err != nil {
-		return err
-	}
+	json.Unmarshal(sig.RawArgs, &payload)
 
-	data := payload["data"].(map[string]interface{})
-	email := data["email"].(string)
+	email := payload["data"].(map[string]interface{})["email"].(string)
+	fmt.Println("USER CREATED EVENT RECEIVED →", email)
 
-	fmt.Printf("[USER_CREATED] Welcome email sent to %s\n", email)
-	return nil // ✅ ACK
+	return nil
 }

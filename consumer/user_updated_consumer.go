@@ -20,39 +20,25 @@ func StartUserUpdatedConsumer() {
 	)
 
 	if err := paotaConfig.GetConfigProvider().SetApplicationConfig(cfg); err != nil {
-		log.Fatalf("failed to set paota config: %v", err)
+		log.Fatal(err)
 	}
 
-	wp, err := workerpool.NewWorkerPool(
-		context.Background(),
-		10,
-		"user-updated-consumer",
-	)
-	if err != nil {
-		log.Fatalf("failed to create worker pool: %v", err)
-	}
+	wp, _ := workerpool.NewWorkerPool(context.Background(), 10, "user-updated")
 
-	if err := wp.RegisterTasks(map[string]interface{}{
+	wp.RegisterTasks(map[string]interface{}{
 		"USER_UPDATED": handleUserUpdated,
-	}); err != nil {
-		log.Fatalf("failed to register task: %v", err)
-	}
+	})
 
-	log.Println("📨 USER_UPDATED consumer started")
-	if err := wp.Start(); err != nil {
-		log.Fatalf("failed to start worker pool: %v", err)
-	}
+	log.Println("USER_UPDATED consumer started")
+	wp.Start()
 }
 
-func handleUserUpdated(arg *schema.Signature) error {
+func handleUserUpdated(sig *schema.Signature) error {
 	var payload map[string]interface{}
-	if err := json.Unmarshal(arg.RawArgs, &payload); err != nil {
-		return err
-	}
+	json.Unmarshal(sig.RawArgs, &payload)
 
-	data := payload["data"].(map[string]interface{})
-	userID := int(data["user_id"].(float64))
+	id := payload["data"].(map[string]interface{})["user_id"]
+	fmt.Println("USER UPDATED EVENT RECEIVED →", id)
 
-	fmt.Printf("[USER_UPDATED] User %d profile updated\n", userID)
-	return nil // ✅ ACK
+	return nil
 }

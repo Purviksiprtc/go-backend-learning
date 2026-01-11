@@ -3,14 +3,12 @@ package handlers
 import (
 	"fmt"
 	"net/http"
-	"os"
 
 	"user-crud-go/config"
 	"user-crud-go/models"
+	"user-crud-go/producer"
 	"user-crud-go/request"
 	"user-crud-go/response"
-
-	"user-crud-go/producer" // ✅ NEW: producer abstraction
 
 	"github.com/labstack/echo/v4"
 	"golang.org/x/crypto/bcrypt"
@@ -66,12 +64,8 @@ func CreateUser(c echo.Context) error {
 		})
 	}
 
-	/* ✅ EVENT: USER_CREATED */
-	prod, err := producer.NewUserProducer(
-		os.Getenv("RABBITMQ_USER_CREATED_QUEUE"),
-		"user.created",
-	)
-	if err == nil {
+	// ✅ EVENT: USER_CREATED
+	if prod, err := producer.NewUserCreatedProducer(); err == nil {
 		_ = prod.Publish(
 			"USER_CREATED",
 			user.ID,
@@ -257,12 +251,8 @@ func UpdateUser(c echo.Context) error {
 		})
 	}
 
-	/* ✅ EVENT: USER_UPDATED */
-	prod, err := producer.NewUserProducer(
-		os.Getenv("RABBITMQ_USER_UPDATED_QUEUE"),
-		"user.updated",
-	)
-	if err == nil {
+	// ✅ EVENT: USER_UPDATED
+	if prod, err := producer.NewUserUpdatedProducer(); err == nil {
 		_ = prod.Publish(
 			"USER_UPDATED",
 			user.ID,
