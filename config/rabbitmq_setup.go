@@ -45,7 +45,7 @@ func SetupQueues() {
 	declareDLXQueue(ch, os.Getenv("USER_UPDATED_TIMEOUT_QUEUE"), exchange, "user.updated")
 	declareDLXQueue(ch, os.Getenv("USER_UPDATED_FAILED_QUEUE"), exchange, "user.updated")
 
-	log.Println("✅ RabbitMQ queues initialized (manager-style)")
+	log.Println(" RabbitMQ queues initialized ")
 }
 
 func declareDLXQueue(ch *amqp.Channel, name, exchange, routingKey string) {
